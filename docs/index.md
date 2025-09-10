@@ -47,8 +47,36 @@ We recommend completing the Core Labs in order, then selecting one or more of th
 
 ## Pre-Requisites
 
+To participate in this workshop, you will need:
+
+1. **A GitHub account**. Create an account for free.
+    - Use a personal account (not enterprise-affiliated)
+    - The free tier of GitHub Codespaces quota is enough
+1. **An Azure subscription**. Create an account for free.
+    - Instructor-led sessions may provide one for you.
+    - Self-guided sessions require you to bring your own.
+1. **Your own laptop**. 
+    - Bring a charger - this is a 4-hour workshop.
+    - Install a modern browser - e.g., Microsoft Edge.
+1. **Familiarity with Coding Environments**
+    - We use Python & Jupyter Notebooks in the labs
+    - We use Visual Studio Code as the editor
+
 ## Getting Started
 
+If you are seeing this instruction guide, you have probably completed these steps:
+
+- [X] Forked this repo to your personal profile
+- [X] Launched GitHub Codespaces from your fork
+- [X] Run `mkdocs serve` to get this preview
+
+Now it's time to dive into the workshop. [**Start here**](./Core-Labs/1-Get-Started/01.md) and pick your learning path!
+
 ## Questions & Feedback
+
+Have questions or feedback? 
+
+1. [File an issue](https://github.com/microsoft/ignite25-PDY123-learn-how-to-observe-manage-and-scale-agentic-ai-apps-using-azure/issues/new) - to report a bug or errors in documentation
+1. [Join the community](https://aka.ms/foundrydevs) - post to the forum or get help on Discord
 
 
