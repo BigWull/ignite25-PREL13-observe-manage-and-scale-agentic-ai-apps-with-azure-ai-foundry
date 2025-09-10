@@ -40,6 +40,7 @@ theme:
     text: Roboto       #Regular
   logo: assets/logo.svg
   language: en
+  custom_dir: docs/overrides
 
   # Theme Modes ...............................................
   palette:
