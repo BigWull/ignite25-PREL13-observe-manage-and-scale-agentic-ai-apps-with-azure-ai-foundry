@@ -421,7 +421,5 @@ FodyWeavers.xsd
 site/*
 
 # .github
-/chatmodes
-chatmodes/*
-.github/chatmodes
-.github/chatmodes/*
+.venv
+.github/chatmodes/
