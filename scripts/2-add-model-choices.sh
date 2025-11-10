@@ -1,15 +1,16 @@
 #!/bin/bash
 
 # ---------------------------------------------------------------------------------------------------------------------------------
-# Add Models Script - Adds additional AI model deployments to existing infrastructure
+# Add Model Choices Script - Adds additional AI model deployments to existing infrastructure
 # - Reads available models from customization/add-models.json
 # - Allows user to select which models to deploy
 # - Updates infrastructure with selected models
+# - Uses .env file instead of azd environment
 #
 # Prerequisites:
-# - 1-setup.sh must have been run successfully
-# - ForBeginners repository must be cloned
+# - .env file must exist in the repository root
 # - Azure infrastructure must be deployed
+# - Azure CLI must be authenticated
 # ---------------------------------------------------------------------------------------------------------------------------------
 
 set -e  # Exit on error
@@ -25,9 +26,23 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Configuration
-TARGET_DIR="$SCRIPT_DIR/ForBeginners"
-AZD_SETUP_DIR="$SCRIPT_DIR/ForBeginners/.azd-setup"
 MODELS_CONFIG="$SCRIPT_DIR/customization/add-models.json"
+
+# Find the repository root
+REPO_ROOT="$SCRIPT_DIR"
+while [ "$REPO_ROOT" != "/" ] && [ "$REPO_ROOT" != "" ]; do
+    if [ -d "$REPO_ROOT/.git" ]; then
+        break
+    fi
+    REPO_ROOT=$(dirname "$REPO_ROOT")
+done
+
+# If .git not found, just go up one level from scripts directory
+if [ "$REPO_ROOT" == "/" ] || [ "$REPO_ROOT" == "" ]; then
+    REPO_ROOT=$(dirname "$SCRIPT_DIR")
+fi
+
+ENV_FILE="$REPO_ROOT/.env"
 
 #==============================================================================
 # Helper Functions
@@ -52,29 +67,35 @@ log_error() {
 check_prerequisites() {
     log_info "Checking prerequisites..."
     
-    # Check if ForBeginners directory exists
-    if [ ! -d "$TARGET_DIR" ]; then
-        log_error "ForBeginners directory not found. Please run 1-setup.sh first."
+    # Check if .env file exists
+    if [ ! -f "$ENV_FILE" ]; then
+        log_error ".env file not found at: $ENV_FILE"
+        log_error "Please run one of the setup scripts first to create the .env file:"
+        log_error "  - 1-get-env-selfguided.sh"
+        log_error "  - 7-get-env-skillable.sh"
         exit 1
     fi
     
-    # Check if azd environment exists by navigating to .azd-setup directory
-    if [ ! -d "$AZD_SETUP_DIR" ]; then
-        log_error ".azd-setup directory not found in ForBeginners. Please run 1-setup.sh first."
+    log_info "Loading environment from: $ENV_FILE"
+    source "$ENV_FILE"
+    
+    # Check if Azure CLI is authenticated
+    if ! az account show &> /dev/null; then
+        log_error "You are not logged into Azure. Please run 'az login' first."
         exit 1
     fi
     
-    cd "$AZD_SETUP_DIR"
-    
-    # Check if azd environment exists
-    local env_count=$(azd env list --output json 2>/dev/null | jq '. | length' 2>/dev/null || echo "0")
-    if [ "$env_count" -eq 0 ]; then
-        log_error "No azd environment found. Please run 1-setup.sh first to create and deploy the infrastructure."
-        cd - > /dev/null
+    # Check required environment variables
+    if [ -z "$AZURE_RESOURCE_GROUP" ]; then
+        log_error "AZURE_RESOURCE_GROUP is not set in .env file"
         exit 1
     fi
     
-    cd - > /dev/null
+    if [ -z "$AZURE_AI_FOUNDRY_NAME" ]; then
+        log_error "AZURE_AI_FOUNDRY_NAME is not set in .env file"
+        log_error "This should be the name of your Azure AI Services (Cognitive Services) account"
+        exit 1
+    fi
     
     # Check if models config file exists
     if [ ! -f "$MODELS_CONFIG" ]; then
@@ -89,111 +110,45 @@ check_prerequisites() {
     fi
     
     log_success "Prerequisites check passed"
+    log_info "Resource Group: $AZURE_RESOURCE_GROUP"
 }
 
-patch_bicep_files() {
-    log_info "Patching Bicep files to support additional model deployments..."
+get_ai_account_name() {
+    # Use the AI Foundry name directly - it's the Cognitive Services account name
+    AI_ACCOUNT_NAME="$AZURE_AI_FOUNDRY_NAME"
     
-    local main_bicep="$AZD_SETUP_DIR/infra/main.bicep"
-    local main_params="$AZD_SETUP_DIR/infra/main.parameters.json"
-    
-    # Check if already patched
-    if grep -q "additionalModelDeployments" "$main_bicep" 2>/dev/null; then
-        log_info "Bicep files already patched"
-        return 0
+    if [ -z "$AI_ACCOUNT_NAME" ]; then
+        log_error "Could not get AI account name from AZURE_AI_FOUNDRY_NAME"
+        exit 1
     fi
     
-    # Backup original files
-    cp "$main_bicep" "$main_bicep.backup" 2>/dev/null || true
-    cp "$main_params" "$main_params.backup" 2>/dev/null || true
-    
-    log_info "Patching main.bicep..."
-    
-    # Patch 1: Add parameter after azureTracingGenAIContentRecordingEnabled
-    awk '
-    /param azureTracingGenAIContentRecordingEnabled bool/ {
-        print
-        print ""
-        print "@description('\''Additional model deployments to add beyond the base agent and embedding models'\'')"
-        print "param additionalModelDeployments array = []"
-        next
-    }
-    {print}
-    ' "$main_bicep" > "$main_bicep.tmp" && mv "$main_bicep.tmp" "$main_bicep"
-    
-    # Patch 2: Update aiDeployments concat to include additionalModelDeployments
-    awk '
-    /var aiDeployments = concat\(/ {
-        in_concat = 1
-        print "var aiDeployments = concat("
-        next
-    }
-    in_concat && /aiChatModel/ {
-        print "  aiChatModel,"
-        next
-    }
-    in_concat && /useSearchService/ {
-        print "  useSearchService ? aiEmbeddingModel : [],"
-        print "  additionalModelDeployments)"
-        in_concat = 0
-        next
-    }
-    !in_concat {print}
-    ' "$main_bicep" > "$main_bicep.tmp" && mv "$main_bicep.tmp" "$main_bicep"
-    
-    log_success "Patched main.bicep"
-    
-    log_info "Patching main.parameters.json..."
-    
-    # Patch main.parameters.json - Remove the environment variable reference
-    # We'll pass the parameter directly via command line instead
-    local temp_file=$(mktemp)
-    if jq 'del(.parameters.additionalModelDeployments)' "$main_params" > "$temp_file" 2>/dev/null; then
-        mv "$temp_file" "$main_params"
-        log_success "Patched main.parameters.json"
-    else
-        rm -f "$temp_file"
-        log_info "additionalModelDeployments not in parameters file (expected on first run)"
-    fi
-    
-    log_success "Bicep files patched successfully"
+    log_info "AI Account: $AI_ACCOUNT_NAME"
 }
 
 get_current_deployments() {
-    cd "$AZD_SETUP_DIR"
-    
-    # Get the current environment name (we know it exists from prerequisites check)
-    local current_env=$(azd env list --output json 2>/dev/null | jq -r '.[0].Name' 2>/dev/null || echo "")
-    
-    # Select the environment
-    azd env select "$current_env" 2>/dev/null
-    
-    # Get currently deployed models from environment variables
-    local agent_deployment=$(azd env get-value AZURE_AI_AGENT_DEPLOYMENT_NAME 2>/dev/null || echo "")
-    local embed_deployment=$(azd env get-value AZURE_AI_EMBED_DEPLOYMENT_NAME 2>/dev/null || echo "")
+    log_info "Retrieving current model deployments..."
     
     CURRENT_DEPLOYMENTS=()
-    [ -n "$agent_deployment" ] && CURRENT_DEPLOYMENTS+=("$agent_deployment")
-    [ -n "$embed_deployment" ] && CURRENT_DEPLOYMENTS+=("$embed_deployment")
     
-    # Also check for additional models already deployed
-    local additional_models=$(azd env get-value ADDITIONAL_MODEL_DEPLOYMENTS 2>&1)
+    # Add base agent deployment if set
+    [ -n "$AZURE_AI_AGENT_DEPLOYMENT_NAME" ] && CURRENT_DEPLOYMENTS+=("$AZURE_AI_AGENT_DEPLOYMENT_NAME")
     
-    # Validate it's valid JSON, otherwise use empty array
-    if ! echo "$additional_models" | jq empty 2>/dev/null; then
-        additional_models="[]"
+    # Add base embedding deployment if set
+    [ -n "$AZURE_AI_EMBED_DEPLOYMENT_NAME" ] && CURRENT_DEPLOYMENTS+=("$AZURE_AI_EMBED_DEPLOYMENT_NAME")
+    
+    # Check for additional models from environment variable
+    if [ -n "$ADDITIONAL_MODEL_DEPLOYMENTS" ] && [ "$ADDITIONAL_MODEL_DEPLOYMENTS" != "[]" ]; then
+        # Validate it's valid JSON
+        if echo "$ADDITIONAL_MODEL_DEPLOYMENTS" | jq empty 2>/dev/null; then
+            local additional_count=$(echo "$ADDITIONAL_MODEL_DEPLOYMENTS" | jq '. | length' 2>/dev/null || echo "0")
+            for ((i=0; i<$additional_count; i++)); do
+                local dep_name=$(echo "$ADDITIONAL_MODEL_DEPLOYMENTS" | jq -r ".[$i].name" 2>/dev/null || echo "")
+                [ -n "$dep_name" ] && CURRENT_DEPLOYMENTS+=("$dep_name")
+            done
+        fi
     fi
     
-    if [ "$additional_models" != "[]" ] && [ -n "$additional_models" ]; then
-        # Parse the JSON array and extract deployment names
-        local additional_count=$(echo "$additional_models" | jq '. | length' 2>/dev/null || echo "0")
-        for ((i=0; i<$additional_count; i++)); do
-            local dep_name=$(echo "$additional_models" | jq -r ".[$i].name" 2>/dev/null || echo "")
-            [ -n "$dep_name" ] && CURRENT_DEPLOYMENTS+=("$dep_name")
-        done
-    fi
-    
-    cd - > /dev/null
+    log_success "Retrieved ${#CURRENT_DEPLOYMENTS[@]} existing deployments"
 }
 
 display_deployed_models() {
@@ -308,13 +263,10 @@ build_deployment_array() {
     echo ""
     log_info "Building deployment configuration..."
     
-    cd "$AZD_SETUP_DIR"
+    # Get existing additional model deployments from environment
+    local existing_deployments="${ADDITIONAL_MODEL_DEPLOYMENTS:-[]}"
     
-    # Get existing additional model deployments
-    # Capture both stdout and stderr, then check if the output is valid JSON
-    local existing_deployments=$(azd env get-value ADDITIONAL_MODEL_DEPLOYMENTS 2>&1)
-    
-    # If the command failed (e.g., key not found), use empty array
+    # Validate it's valid JSON
     if ! echo "$existing_deployments" | jq empty 2>/dev/null; then
         existing_deployments="[]"
     fi
@@ -326,7 +278,6 @@ build_deployment_array() {
     else
         # Remove the closing bracket from existing deployments to append new ones
         DEPLOYMENT_JSON="${existing_deployments%]}"
-        # Don't add comma yet - will add it before first new item
         local first=false
     fi
     
@@ -361,49 +312,11 @@ build_deployment_array() {
     fi
     
     log_success "Deployment configuration built"
-    cd - > /dev/null
 }
 
 deploy_additional_models() {
     echo ""
     log_info "Deploying additional models..."
-    
-    cd "$AZD_SETUP_DIR"
-    
-    # Get the current environment name
-    local current_env=$(azd env list --output json 2>/dev/null | jq -r '.[0].Name' 2>/dev/null || echo "")
-    
-    if [ -z "$current_env" ] || [ "$current_env" == "null" ]; then
-        log_error "No azd environment found. Please run 1-setup.sh first."
-        cd - > /dev/null
-        exit 1
-    fi
-    
-    log_info "Using existing environment: $current_env"
-    azd env select "$current_env"
-    
-    # Get required values from azd environment
-    local resource_group=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || echo "")
-    local resource_id=$(azd env get-value AZURE_EXISTING_AIPROJECT_RESOURCE_ID 2>/dev/null || echo "")
-    
-    # Extract the AI Services account name from the resource ID
-    # Format: /subscriptions/.../resourceGroups/.../providers/Microsoft.CognitiveServices/accounts/ACCOUNT_NAME/...
-    local ai_account_name=""
-    if [ -n "$resource_id" ]; then
-        ai_account_name=$(echo "$resource_id" | grep -oP 'accounts/\K[^/]+' || echo "")
-    fi
-    
-    if [ -z "$resource_group" ] || [ -z "$ai_account_name" ]; then
-        log_error "Could not retrieve required information from environment"
-        log_error "Resource Group: $resource_group"
-        log_error "AI Account: $ai_account_name"
-        log_error "Resource ID: $resource_id"
-        cd - > /dev/null
-        exit 1
-    fi
-    
-    log_info "Resource Group: $resource_group"
-    log_info "AI Account: $ai_account_name"
     
     # Create parameters file for the deployment
     local params_file=$(mktemp)
@@ -413,7 +326,7 @@ deploy_additional_models() {
   "contentVersion": "1.0.0.0",
   "parameters": {
     "accountName": {
-      "value": "$ai_account_name"
+      "value": "$AI_ACCOUNT_NAME"
     },
     "modelDeployments": {
       "value": $DEPLOYMENT_JSON
@@ -433,32 +346,56 @@ EOF
     local template_file="$SCRIPT_DIR/customization/add-models.bicep"
     
     if az deployment group create \
-        --resource-group "$resource_group" \
+        --resource-group "$AZURE_RESOURCE_GROUP" \
         --template-file "$template_file" \
         --parameters "@$params_file" \
         --name "additional-models-$(date +%Y%m%d-%H%M%S)"; then
         
         log_success "Additional models deployed successfully!"
         
-        # Update the environment variable to track what we've deployed
-        local backup_deployments=$(azd env get-value ADDITIONAL_MODEL_DEPLOYMENTS 2>&1)
-        
-        # Validate backup is valid JSON
-        if ! echo "$backup_deployments" | jq empty 2>/dev/null; then
-            backup_deployments="[]"
-        fi
-        
-        azd env set ADDITIONAL_MODEL_DEPLOYMENTS "$DEPLOYMENT_JSON"
-        log_success "Environment variable updated with deployment configuration"
+        # Update the .env file with the new deployment configuration
+        update_env_file
     else
         log_error "Failed to deploy additional models"
         rm -f "$params_file"
-        cd - > /dev/null
         exit 1
     fi
     
     rm -f "$params_file"
-    cd - > /dev/null
+}
+
+update_env_file() {
+    log_info "Updating .env file with deployment configuration..."
+    
+    # Create a backup of the .env file
+    local backup_file="${ENV_FILE}.backup.$(date +%Y%m%d-%H%M%S)"
+    cp "$ENV_FILE" "$backup_file"
+    log_info "Created backup: ${backup_file##*/}"
+    
+    # Check if ADDITIONAL_MODEL_DEPLOYMENTS already exists in .env
+    if grep -q "^ADDITIONAL_MODEL_DEPLOYMENTS=" "$ENV_FILE"; then
+        # Update existing line
+        # Use a temporary file to avoid issues with sed on different platforms
+        local temp_file=$(mktemp)
+        awk -v deployment="$DEPLOYMENT_JSON" '
+        /^ADDITIONAL_MODEL_DEPLOYMENTS=/ {
+            print "ADDITIONAL_MODEL_DEPLOYMENTS=" deployment
+            next
+        }
+        {print}
+        ' "$ENV_FILE" > "$temp_file"
+        mv "$temp_file" "$ENV_FILE"
+        log_success "Updated ADDITIONAL_MODEL_DEPLOYMENTS in .env file"
+    else
+        # Append new line
+        echo "" >> "$ENV_FILE"
+        echo "# Additional Model Deployments (added by 2-add-model-choices.sh)" >> "$ENV_FILE"
+        echo "ADDITIONAL_MODEL_DEPLOYMENTS=$DEPLOYMENT_JSON" >> "$ENV_FILE"
+        log_success "Added ADDITIONAL_MODEL_DEPLOYMENTS to .env file"
+    fi
+    
+    # Reload the environment to pick up changes
+    source "$ENV_FILE"
 }
 
 display_summary() {
@@ -482,12 +419,12 @@ display_summary() {
 main() {
     echo -e "${BLUE}========================================${NC}"
     echo -e "${BLUE}  Add Additional Model Deployments${NC}"
+    echo -e "${BLUE}  (Using .env file)${NC}"
     echo -e "${BLUE}========================================${NC}"
     echo ""
     
     check_prerequisites
-    # No need to patch Bicep files - using standalone template
-    log_info "Using standalone Bicep template: customization/add-models.bicep"
+    get_ai_account_name
     get_current_deployments
     display_deployed_models
     display_available_models
@@ -498,6 +435,9 @@ main() {
     
     echo ""
     log_success "Model deployment completed successfully!"
+    echo ""
+    log_info "Note: The .env file has been updated. You may want to reload it:"
+    log_info "  source $ENV_FILE"
 }
 
 # Run main function

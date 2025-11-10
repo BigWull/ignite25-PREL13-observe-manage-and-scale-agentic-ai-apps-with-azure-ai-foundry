@@ -18,9 +18,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Configuration
+# Configuration - was "msignite25-prel13"
 REPO_URL="https://github.com/microsoft/ForBeginners"
-DEFAULT_BRANCH="msignite25-prel13"
+DEFAULT_BRANCH="for-release-1.0.4" 
 TARGET_DIR="./ForBeginners"
 AZD_SETUP_DIR="./ForBeginners/.azd-setup"
 

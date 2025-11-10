@@ -2,7 +2,13 @@
 
     🚨🚨🚨 TRACING ENV NEEDS MANUAL UPDATE - TODO: FIX IT 🚨🚨
 
-Use this guide if you are exploring this workshop on your own, at home. To do this you will need:
+
+Use this guide if you are working on these labs on your own at home!
+
+
+## 1. Pre-Requisites
+
+You will need:
 
 - A personal GitHub account - [signup here for free](https://github.com/signup)
 - An active Azure account -  [signup here for free](https://aka.ms/free)
@@ -12,178 +18,154 @@ Use this guide if you are exploring this workshop on your own, at home. To do th
 
 <br/>
 
-## 1. Fork This Repo
+## 2. Setup Dev Environment
 
-1. If you already have a fork of the repo, just pull the latest changes to get ready.
-1. If you don't have a fork already, [use this link](https://github.com/microsoft/ignite25-PREL13-observe-manage-and-scale-agentic-ai-apps-with-azure-ai-foundry/fork) to create one in your GitHub proile.
-1. Open a new browser tab and navigate to that fork in the browser.
+First, let's get you set up with a development environment for the lab. The repository is setup with a `devcontainer.json` that provides a pre-build development environment with all tools and dependencies installed. Let's activate that in three steps!
 
-## 2. Launch GitHub Codespaces
+### 2.1. Fork This Repo
 
-1. Click the blue "Code" button in that GitHub page to see options
-1. Select the "Codespaces" tab and click "+" to launch a new codespace
-1. This opens a new tab with a VS Code IDE - wait till that loads completely
+1. Create a fork of this repo in your personal profile [using this link](https://github.com/microsoft/ignite25-PREL13-observe-manage-and-scale-agentic-ai-apps-with-azure-ai-foundry/fork)
+1. Open a new browser tab - navigate to your new fork
 
-## 3. Authenticate With Azure
+### 2.2. Launch GitHub Codespaces
 
-1. Open a new terminal session in that VS Code window - wait till ready.
-1. Run this command - and complete the workflow with **your** Azure subscription
+1. Click the blue "Code" button - select the "Codespaces" tab
+1. Click "+" to launch a new codespace - it opens a new tab
+1. You will see a VS Code IDE - wait till that loads completely
+
+### 2.3. Authenticate With Azure
+
+1. Open a terminal in that VS Code session - wait till prompt is active
+1. Run this command - follow steps to complete auth with **your** subscription
 
     ```bash title="" linenums="0"
     az login
     ```
-1. _We can now use this for managed identity credentials in code later_.
+1. When flow is complete, return to VS Code - accept default subscription
+
+_Your development environment is ready - and connected to Azure!_
 
 <br/>
 
-## 4. Provision AI Agents Template
+## 3. Provision Your AI Agents Resources
 
-1. The [Azure Developer CLI](https://aka.ms/azd) streamlines provsioning and deployment for AI Apps.
-1. The [AI Apps Gallery](https://aka.ms/ai-apps) has a number of curated AI application templates for AZD.
-1. In this repo, we have scripts to setup of the [Get Started With AI Agents](https://github.com/Azure-Samples/get-started-with-ai-agents) template
+1. We'll jumpstart our development using the [Get Started With AI Agents](https://github.com/Azure-Samples/get-started-with-ai-agents) template
+1. This provides a solution architecutre with sample code & infrastructure files
+1. We created a _custom_ version of this template that you can install with scripts.
 
-**Let's Run the scripts in order**: _we recommend the defaults below_.
+_Let's get this done_
 
-1. Change working directory: `cd scripts/`
-1. Run the setup script: `./1-setup.sh`
-1. Enter branch name: `msignite25-lab516`
-1. Enter environment name: `ignite-PREL13`
-1. Enter Azure region: `swedencentral`
-1. Enter Subscription ID: _your subscription id here_
-1. Do you want to activate Azure AI Search? (yes/no) [no]: yes
-1. Use these defaults? (yes/no) [yes]: yes
-1. Proceed with deployment? (yes/no): yes
+1. Open a new VS Code Terminal. Complete these steps:
 
-<details>
-<summary> ➡️ ➡️ CLICK TO EXPAND FOR DETAILS </summary>
-
-**By completing this step you will see:** 
-
-1. A local folder created: `scripts/ForBeginners` - cloned from our custom repo
-1. An azd template inside: `scripts/ForBeginners/.azd-setup` - with infra-as-code
-1. Our azd environment: `scripts/ForBeginners/.azd-setup/ignite-PREL13` with:
-    - a `config.json` - with environment configuration
-    - a `.env` - with environment variables from our infra deployment
-1. The deployment process will also begin - watch the console for updates.
-    1. Make sure you have the required model quotas and access permissions.
-    1. The process will take 10-15 minutes to complete.
-
+    ```bash
+    cd scripts
+    ./1-setup.sh
     ```
-    SUCCESS: Your up workflow to provision and deploy to Azure completed in 14 minutes 5 seconds.
-    ✓ Infrastructure deployed successfully
+1. Then complete the interactive steps providing responses like this:
 
-    ======================================
-    Setup Complete!
-    ======================================
-    ✓ Repository cloned
-    ✓ Environment configured
-    ✓ Infrastructure deployed
-    ✓ Azure AI Search enabled (Index: zava-products)
-    ======================================
+    1. Enter branch name: `for-release-1.0.4`
+    1. Enter environment name: `Ignite-PREL13`
+    1. Enter Azure region: `swedencentral`
+    1. Enter Subscription ID: _your subscription id here_
+    1. Do you want to activate Azure AI Search? (yes/no) [no]: yes
+    1. Use these defaults? (yes/no) [yes]: yes
+    1. Proceed with deployment? (yes/no): yes
+
+1. When complete you should see:
+
+    1. A `scripts/ForBeginners/` folder cloned from a template repo
+    1. A `scripts/ForBeginners/.azd-setup` with infrastructure files
+    1. A `scripts/ForBeginners/.azd-setup/.azure` with infra env config
+
+<br/>
+
+**TROUBLESHOOTING:**
+
+1. You may see issues related to "bicep" not being available. To fix, do the following:
+    ```bash
+    cd ForBeginners/.azd-setup
+    azd up
     ```
 
-1. Populate the `.env` file from the provisioned environment variables
+    This completes azd deployment directly and ends with something like this:
 
-    ```
-    ./6-get-env.sh
-    ```
-
-    The script will automatically:
-    - ✅ Extract the correct Azure AI Project name from your deployment
-    - ✅ Retrieve Azure OpenAI API key programmatically
-    - ✅ Retrieve Azure AI Search API key programmatically
-    - ✅ Use the correct OpenAI endpoint format (`.openai.azure.com`)
-    - ✅ Configure Application Insights connection string
-
-    You should see output like:
-
-    ```
-    ✅ Successfully updated .env file!
-
-    📋 Updated Variables:
-      • Resource Group: rg-ignite-PREL13
-      • Location: swedencentral
-      • OpenAI Endpoint: https://aoai-XXXXXXX.openai.azure.com/
-      • OpenAI API Key: ✓ Retrieved
-      • AI Search Endpoint: https://srch-XXXXX.search.windows.net/
-      • AI Search API Key: ✓ Retrieved
-      • AI Project Name: proj-XXXXX
-      • Container Registry: XXXX.azurecr.io
-      • Service API URI: https://ca-api-XXX...
-      • Application Insights: ✓ Connected
-
-    💡 All API keys have been automatically retrieved from Azure!
-
-    💡 All API keys have been automatically retrieved from Azure!
-
-    ======================================
-    ✓ Done!
-    ======================================
+    ```bash
+    SUCCESS: Your up workflow to provision and deploy to Azure completed in 12 minutes 39 seconds.
     ```
 
+1.  You may get a deployment error part way through 
 
-1. Now populate products and update the search index
+    ```bash
+    Deployment Error Details:
+    RequestConflict: Cannot modify resource with id '/.../providers/Microsoft.CognitiveServices/accounts/aoai-t7sla5j64lcvo' because the resource entity provisioning state is not terminal
+    ```
+
+    This is typically caused by a timing issue where a previous resource task has not completed. The best way to resolve this is to back off and try again. So just wait a few minutes, then retry this - and it should complete.
+
+    ```bash
+    azd up
+    ```
+
+<br/>
+
+## 4. Set up `.env` variables.
+
+1. Make sure you are authenticated with Azure CLI.  We will use this to retrieve and create a `.env` file based on the `scripts/.env.sample` format
+
+    ```bash
+    az login
+    ```
+
+1. Run this script from root of repo - it will create `.env` with values extracted by Azure CLI. _By default it looks for an `rg-Ignite-XXX` resource group but you can override it.
 
     ```
+    ./scripts/1-update-env-selfguided.sh 
+    ``````
+
+<br/>
+
+## 5. Populate Search Data
+
+1. We have Zava data in `scripts/customization`. Let's create a product index in Azure AI Search. Switch to the `scripts/` folder and run the command:
+
+    ```
+    cd scripts/
     python 2-add-product-index.py 
     ```
 
-    You should see something like this:
+1. This will first run an RBAC update script to give this user the right roles and access to make updates.
+1. Then it should upload 49 products to a `zava-products` index with semantic search, in Azure AI Search.
 
-    ```
-    ======================================================================
-    Add Products to Azure AI Search Index
-    ======================================================================
-    Using environment variables from system/default locations
-    ✓ Azure CLI authentication verified
-    Running RBAC update script to ensure proper permissions...
-    ..
-    ..
-    Uploading 49 products to index 'zava-products'...
-    ✓ Successfully uploaded 49 products to the search index!
+<br/>
 
-    The product catalog is now ready for semantic search.
-    ======================================================================
-    ```
+## 6. Add Model Choices
 
-1. Now, lets add the models you need to explore customizaton.
+The default AI Agents template will deploy one chat model. The AI Search index creation will require a second text-embedding model.
 
-    ```
-    ./2-add-models.sh 
+In addition, we want to be able to show _model selection_ with evaluators and graders - so we want to have a suitable set of model choices available. This script makes that happen.
+
+1. Update the `scripts/customization/add-models.json` with the list of models you want to choose from, for deployments
+
+1. Run this script and provide the selection you actually want deployed:
+
+    ```bash
+    cd scripts/
+    ./2-add-model-choices.sh 
     ```
 
-    You should see something like this:
+1. On success you should see:
 
-    ```
+    ```bash
     ========================================
     Add Additional Model Deployments
+    (Using .env file)
     ========================================
 
     ℹ️  Checking prerequisites...
-    ✓ Prerequisites check passed
-    ℹ️  Using standalone Bicep template: customization/add-models.bicep
-
-    ========================================
-    Currently Deployed Models
-    ========================================
-
-    ✓ gpt-4.1
-    ✓ text-embedding-3-large
-
-    ========================================
-    Available Models to Deploy
-    ========================================
     ...
     ...
 
-    Select models to deploy (enter numbers separated by spaces, e.g., '1 3 5'):
-    Or type 'all' to deploy all available models, or 'cancel' to exit:
-    > all
-    ...
-    ...
-
-    ✓ Additional models deployed successfully!
-    ✓ Environment variable updated with deployment configuration
+    ✓ Added ADDITIONAL_MODEL_DEPLOYMENTS to .env file
 
     ========================================
     Deployment Summary
@@ -199,19 +181,39 @@ Use this guide if you are exploring this workshop on your own, at home. To do th
 
     ✓ Model deployment completed successfully!
     ```
-</details>
+
+1. It will also update the `.env` file with the relevant variable and list:
+
+```bash
+ADDITIONAL_MODEL_DEPLOYMENTS=[{"name":"model-router","model":{"format":"OpenAI","name":"model-router","version":"2025-05-19"},"sku":{"name":"GlobalStandard","capacity":20}},{"name":"gpt-4o","model":{"format":"OpenAI","name":"gpt-4o","version":"2024-11-20"},"sku":{"name":"GlobalStandard","capacity":20}},{"name":"gpt-4o-mini","model":{"format":"OpenAI","name":"gpt-4o-mini","version":"2024-07-18"},"sku":{"name":"GlobalStandard","capacity":20}},{"name":"gpt-4.1-mini","model":{"format":"OpenAI","name":"gpt-4.1-mini","version":"2025-04-14"},"sku":{"name":"GlobalStandard","capacity":20}},{"name":"gpt-4.1-nano","model":{"format":"OpenAI","name":"gpt-4.1-nano","version":"2025-04-14"},"sku":{"name":"GlobalStandard","capacity":20}},{"name":"o3-mini","model":{"format":"OpenAI","name":"o3-mini","version":"2025-01-31"},"sku":{"name":"GlobalStandard","capacity":20}},{"name":"o4-mini","model":{"format":"OpenAI","name":"o4-mini","version":"2025-04-16"},"sku":{"name":"GlobalStandard","capacity":20}}]
+```
 
 <br/>
 
-## 4b. Optional: Using Pre-Existing Infra
+## 7. Validate your `.env` variables
 
-This section is relevant ONLY if you had already completed the deployment previously, and are now launching a new GitHub Codespaces to work with your pre-existing deployment. The goal is to refresh environment variables from existing infrastructure.
+1. It's easy - there's a notebook for that!
+1. Open `labs/0-setup/00-validate-setup.ipynb` in your Visual Studio Code editor.
+1. Select Kernel - pick the default Python environment
+1. "Run All" - to have validation checks run.
 
-1. In this case, respond with `no` to the "Proceed ith deployment?" question.
-1. Then switch to location containing template: `cd ForBeginners/.azd-setup`
-1. Login with azd: `azd auth login` - complete workflow with Azure subscription
-1. Then run the `azd env refresh` command - wait till it completes
-1. Your `scripts/ForBeginners/.azd-setup/ignite-PREL13/.env` will get updated!
+```bash
+============================================================
+📊 VALIDATION SUMMARY
+============================================================
+✅ Valid variables: 47
+❌ Missing variables: 0
+
+🎉 All environment variables are properly configured!
+   You're ready to proceed with the lab exercises.
+```
+
+
+## 8. (Optional) Refresh Env From Existing Infra
+
+What if you had provisioned infrastructure earlier - but had deleted your Codespaces? Can you _restore_ environment variables from an existing infrastructure?
+
+Yes. Note that the `scripts/1-update-env-selfguided.sh` script only needs your subscription and a resource group, and it can retrieve and update your `.env`. 
 
 <br/>
 
