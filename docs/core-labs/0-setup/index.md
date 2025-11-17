@@ -12,7 +12,7 @@ _The workshop guide is setup for use both in-venue (for instructor-led sessions)
     - **Subscription** - You will use the subscription provided by Skillable
     - **Infrastructure** - Has been pre-provisioned for you!
 
-    **✅ You're all set! [Move directly to the next step to validate it!](./00-setup.md)**
+    **✅ You're all set! [Move directly to the next step to validate it!](./00-validate-setup.md)**
 
 === "SELF-GUIDED SESSION"
 
