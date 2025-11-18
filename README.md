@@ -3,6 +3,7 @@
 </p>
 # Notes
 https://shiny-giggle-r44v56vvpxrcp4jr-8000.app.github.dev/ignite25-PDY123-learn-how-to-observe-manage-and-scale-agentic-ai-apps-using-azure/
+AI Templates: https://ai.azure.com/resource/build/template
 
 
 # [Microsoft Ignite 2025](https://ignite.microsoft.com)
